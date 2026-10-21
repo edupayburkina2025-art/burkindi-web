@@ -2,7 +2,7 @@
    La nouvelle version s'installe en arrière-plan puis attend : l'application
    affiche « Nouvelle version disponible » et l'utilisateur choisit le moment
    (message MISE_A_JOUR). Le message VERSION renvoie le numéro de version. */
-const VERSION="1.12";
+const VERSION="1.12.1";
 const CACHE="burkindi-"+VERSION;
 const FICHIERS=["./","index.html","manifest.webmanifest","icone-192.png","icone-512.png","icone-masquable-512.png","icone-apple-180.png"];
 
