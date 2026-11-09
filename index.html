@@ -1976,6 +1976,10 @@ html.sombre .fo-l.bas{background:#3D3112;border-color:#6B5527}
 .poly113t{font-weight:bold;margin:10px 0 4px;font-size:1.05em}
 .poly113n{font-style:italic;font-size:.9em;margin-top:6px}
 .poly113i{margin-bottom:10px}.poly113i .btn{margin-top:6px}
+.cote113{display:flex;gap:4px;margin:0 0 6px;flex-wrap:wrap}.cote113 button{flex:1;min-width:150px}
+.pres113{max-width:520px}
+.ecr113 .vign.ecr{background:#E3EFE9;color:#1F5C45;font-weight:800}
+.ecr113{position:relative}.ecr113 .aide113{margin-left:auto;border:1px solid #c9c9c9;background:#fff;border-radius:50%;width:24px;height:24px;font-weight:800;cursor:pointer;flex:0 0 auto}
 /* ===== 1.13 — présentation des documents (même police Times New Roman) =====
    Bulletins : réglages SANS hauteur ajoutée (le pire cas de la 1.12.2, 13
    disciplines à deux par page, n'avait aucune marge : essai z_t11). */
@@ -7161,7 +7165,7 @@ const EDITEUR={nom:"Bassirou DERRA",
 const SERVICES_AUTEUR=["Création de logos","Confection de tee-shirts",
   "Formations en intelligence artificielle et en bureautique",
   "EduP@y : épargne et livraison des fournitures scolaires"];
-const VERSION_APP="1.13";
+const VERSION_APP="1.13.1";
 const TITRE_APP=document.title;   /* rétabli après chaque impression */
 function contactAuteur(){ return EDITEUR.nom+", "+EDITEUR.telephone+" ("+EDITEUR.tel2+")"; }
 function logoSVG(t,surVert){
@@ -23651,6 +23655,236 @@ exportStatistiques=function(){
   fA.filter(f=>f.nom==="Année").forEach(f=>feuilles.push(f));
   if(!feuilles.length){ alert("Aucune moyenne n'est encore calculable."); return; }
   telecharger(blobXLSX(feuilles),"Statistiques_"+nomFichierSur(S.etab.nom||"etablissement")+".xlsx");
+};
+/* =====================================================================
+   Burkindi 1.13.1 — p34 : séries techniques, professionnelles et
+   polyvalentes dans Classes ; régime choisi d'office ; passage d'année
+   (maquettes 1.13.1 v2 validées le 09/11/2026, points 1 et 2).
+   - Catalogue des séries (sources générales, pas de texte officiel) ;
+     CAP, BEP, Bac pro : spécialité dans une liste, ou « Autre… » écrite
+     par le chef (gardée dans S.specialites113).
+   - Polyvalent : 2nde C' seulement, classe de passage vers la 1re
+     générale (A, C, D) ou le BEP 1.
+   - Régime : technique, professionnel, polyvalent → semestres à la
+     création ; le chef peut changer (c.regimeChef) ; une ancienne classe
+     rattachée à ces ordres : proposition seulement ; jamais si notes.
+   - Sans grille officielle : matières et coefficients saisis par le chef.
+   ===================================================================== */
+const ORDRES_SEM=["Enseignement technique","Enseignement professionnel","Polyvalent"];
+const SPEC_TECH=["Électrotechnique","Électronique","Mécanique générale","Mécanique automobile","Froid et climatisation","Construction métallique",
+  "Menuiserie","Maçonnerie","Comptabilité","Secrétariat","Commerce","Habillement","Hôtellerie-restauration"];
+const SPEC_PRO=["Maintenance des véhicules automobiles","Électrotechnique","Maintenance industrielle","Froid et climatisation","Comptabilité-gestion","Commerce","Agriculture"];
+const SERIES_TECH_LT=["E — Mathématiques et techniques","F1 — Construction mécanique","F2 — Électronique","F3 — Électrotechnique","F4 — Génie civil",
+  "G1 — Techniques administratives","G2 — Techniques quantitatives de gestion","H — Informatique"];
+const CATALOGUE113=[
+  {o:"Enseignement technique",n:"2nde",s:["Ti — Technique industrielle"]},
+  {o:"Enseignement technique",n:"1re",s:SERIES_TECH_LT},{o:"Enseignement technique",n:"Tle",s:SERIES_TECH_LT},
+  {o:"Enseignement technique",n:"CAP 1",s:SPEC_TECH,spec:true},{o:"Enseignement technique",n:"CAP 2",s:SPEC_TECH,spec:true},
+  {o:"Enseignement technique",n:"BEP 1",s:SPEC_TECH,spec:true},{o:"Enseignement technique",n:"BEP 2",s:SPEC_TECH,spec:true},
+  {o:"Enseignement professionnel",n:"Bac pro 1",s:SPEC_PRO,spec:true},{o:"Enseignement professionnel",n:"Bac pro 2",s:SPEC_PRO,spec:true},
+  {o:"Polyvalent",n:"2nde",s:["C'"]}];
+const AUTRE113="Autre… (à écrire)";
+if(ORDRES.indexOf("Enseignement professionnel")<0) ORDRES.push("Enseignement professionnel");
+if(ORDRES.indexOf("Polyvalent")<0) ORDRES.push("Polyvalent");
+function specPerso(o,n){ const k=o+"|"+n; return ((S.specialites113||{})[k]||[]).slice(); }
+function cat113(o,n){ return CATALOGUE113.find(x=>x.o===o&&x.n===n); }
+const niveauxDe_av1131=niveauxDe;
+niveauxDe=function(o){ const l=niveauxDe_av1131(o).filter(n=>!(ORDRES_SEM.indexOf(o)>=0&&!cat113(o,n)&&!classeUtilise(o,n)));
+  CATALOGUE113.filter(x=>x.o===o).forEach(x=>{ if(l.indexOf(x.n)<0) l.push(x.n); }); return l; };
+function classeUtilise(o,n,s){ return S.classes.some(c=>c.ordre===o&&c.niveau===n&&(s===undefined||c.serie===s)); }
+const seriesDe_av1131=seriesDe;
+seriesDe=function(o,n){
+  const C=cat113(o,n);
+  /* séries de démonstration (Comptabilité, Mécanique) : seulement si une classe les utilise encore */
+  let l=seriesDe_av1131(o,n).filter(s=>!(ORDRES_SEM.indexOf(o)>=0&&GRILLE.some(g=>g.ordre===o&&g.niveau===n&&g.serie===s&&g.src==="demo")&&!classeUtilise(o,n,s)));
+  if(C) C.s.forEach(s=>{ if(l.indexOf(s)<0) l.push(s); });
+  specPerso(o,n).forEach(s=>{ if(l.indexOf(s)<0) l.push(s); });
+  S.classes.forEach(c=>{ if(c.ordre===o&&c.niveau===n&&c.serie&&l.indexOf(c.serie)<0) l.push(c.serie); });
+  if(C&&C.spec) l.push(AUTRE113);
+  return l;
+};
+/* « Autre… » : la spécialité est écrite par le chef et gardée pour l'établissement */
+const lireClasse_av1131=lireClasse;
+lireClasse=function(){
+  lireClasse_av1131.apply(this,arguments);
+  const c=brouillon&&brouillon.data; if(!c||c.serie!==AUTRE113) return;
+  const v=String(prompt("Spécialité de la classe ("+c.niveau+") :","")||"").replace(/\s+/g," ").trim();
+  if(!v){ c.serie=seriesDe(c.ordre,c.niveau)[0]; const el=document.getElementById("c_serie"); if(el) el.value=c.serie; return; }
+  if(!S.specialites113) S.specialites113={}; const k=c.ordre+"|"+c.niveau; if(!S.specialites113[k]) S.specialites113[k]=[];
+  if(S.specialites113[k].indexOf(v)<0) S.specialites113[k].push(v);
+  c.serie=v;
+};
+/* rappel dans le formulaire : pas encore de grille officielle */
+const dessinerClasse_av1131=dessinerClasse;
+dessinerClasse=function(){
+  const r=dessinerClasse_av1131.apply(this,arguments);
+  try{ const c=brouillon.data, z=document.getElementById("c_serie");
+    if(z&&ORDRES_SEM.indexOf(c.ordre)>=0&&!grilleDe(c).length&&!document.getElementById("c_grille113")){
+      const d=document.createElement("div"); d.id="c_grille113"; d.className="prudence";
+      d.textContent="Pas encore de grille officielle pour cette série : après l'enregistrement, saisissez ses matières et coefficients dans « Matières et coefficients », comme aujourd'hui. Régime proposé : semestres (modifiable dans Calendrier scolaire › Régime des classes).";
+      const p=z.closest(".duo")||z.parentNode; p.parentNode.insertBefore(d,p.nextSibling); } }catch(e){}
+  return r;
+};
+/* régime choisi d'office */
+function regimeOffice(c){ return ORDRES_SEM.indexOf(c.ordre)>=0?"S":""; }
+const sauverClasse_av1131=sauverClasse;
+sauverClasse=function(){
+  const id=brouillon&&brouillon.id, avant=id?Object.assign({},classe(id)):null, n0=S.classes.length;
+  const r=sauverClasse_av1131.apply(this,arguments);
+  let c=null;
+  if(!id&&S.classes.length===n0+1) c=S.classes[S.classes.length-1];
+  if(c){ /* nouvelle classe */
+    if(regimeOffice(c)) c.regime="S";
+    if(/^bac pro 1$/i.test(c.niveau)&&!c.rentree113) c.rentree113=premierJourCours113("01/11/"+anneesB()[0]);
+    modifie(); rendre(); return r; }
+  if(id&&avant){ c=classe(id); if(!c) return r;
+    const change=avant.ordre!==c.ordre||avant.niveau!==c.niveau||avant.serie!==c.serie;
+    if(change&&!c.regimeChef&&!notesDeClasse(c.id)){
+      const voulu=regimeOffice(c);
+      if(avant.cree113){ if(voulu) c.regime="S"; else delete c.regime; }
+      else if(voulu&&!estSem(c)&&confirm("La classe "+c.code+" est maintenant en « "+c.ordre+" ».\n\nLa passer en semestres ?")) c.regime="S";
+      modifie(); rendre(); }
+  }
+  return r;
+};
+/* une classe créée en 1.13.1 suit la règle d'office ; une ancienne classe : proposition seulement */
+const sauverClasse_av1131b=sauverClasse;
+sauverClasse=function(){ const id=brouillon&&brouillon.id, n0=S.classes.length; const r=sauverClasse_av1131b.apply(this,arguments);
+  if(!id&&S.classes.length===n0+1) S.classes[S.classes.length-1].cree113=true; return r; };
+/* le choix du chef est gardé */
+const changerRegime_av1131=changerRegime;
+changerRegime=function(cid,v){ const c=classe(cid), a=c&&c.regime; changerRegime_av1131.apply(this,arguments);
+  if(c&&(c.regime||"")!==(a||"")) c.regimeChef=true; };
+/* --- passage d'année : technique, professionnel, polyvalent --------------- */
+const SUIV_TECH={"2nde":"1re","1re":"Tle","CAP 1":"CAP 2","BEP 1":"BEP 2","Bac pro 1":"Bac pro 2"};
+const classesSuivantes_av1131=classesSuivantes;
+classesSuivantes=function(c){
+  if(!c) return [];
+  if(c.ordre==="Polyvalent") /* 2nde C' : vers la 1re générale ou le BEP 1 */
+    return S.classes.filter(x=>(estGeneral(x)&&x.niveau==="1re")||(x.ordre==="Enseignement technique"&&x.niveau==="BEP 1"));
+  if(c.ordre==="Enseignement technique"||c.ordre==="Enseignement professionnel"){
+    const nv=SUIV_TECH[c.niveau];
+    if(nv){ if(c.niveau==="2nde") return S.classes.filter(x=>x.ordre===c.ordre&&x.niveau==="1re");
+      const l=S.classes.filter(x=>x.ordre===c.ordre&&x.niveau===nv&&sansAccents(x.serie)===sansAccents(c.serie));
+      if(l.length) return l; }
+  }
+  return classesSuivantes_av1131.apply(this,arguments);
+};
+/* =====================================================================
+   Burkindi 1.13.1 — p35 : un conseil propre aux classes semestrielles,
+   et le président du conseil (maquettes 1.13.1 v2, point 3).
+   - Conseil des classes : choix « Classes en trimestres / Classes en
+     semestres » (seulement si l'établissement a des classes semestrielles).
+   - Chaque côté a ses informations (date, lieu, président, secrétaire,
+     présents, ordre du jour, synthèse) : S.conseilsEtab["1".."3"] pour les
+     trimestres, S.conseilsEtab["S1"], ["S3"] pour les semestres (S2 rangé
+     dans la case 3, fin d'année). Rien ne change sans classe semestrielle.
+   - Président : chef d'établissement (d'office), censeur ou conseiller
+     principal d'éducation, des deux côtés.
+   ===================================================================== */
+let cote113="T";
+function coteSem(){ return cote113==="S"&&polyvalent113(); }
+const conseilEtab_av1131=conseilEtab;
+conseilEtab=function(t){
+  if(!coteSem()) return conseilEtab_av1131(t);
+  S.conseilsEtab=S.conseilsEtab||{}; const k="S"+t;
+  if(!S.conseilsEtab[k]) S.conseilsEtab[k]={date:"",heure:"",heureFin:"",lieu:"",secretaire:"",odj:(t===3?ODJ_ETAB_T3:ODJ_ETAB).slice(),compteRendu:"",synthese:"",cas:"",divers:"",admin:[],
+    parents:[{nom:"",qualite:"Président de l'Association des parents d'élèves"},{nom:"",qualite:"Présidente de l'Association des mères éducatrices"}],presidentId:""};
+  return S.conseilsEtab[k];
+};
+function choisirCote113(v){ cote113=v==="S"?"S":"T"; if(cote113==="S"&&trimActif===2) trimActif=semDuJour(); rendre(); }
+/* président : chef (d'office), censeur ou CPE */
+const FONCTIONS_PRES=["Censeur","Conseiller principal d’éducation","Conseiller principal d'éducation"];
+function presidentsPossibles(){ return S.ens.filter(p=>FONCTIONS_PRES.indexOf(p.fonction)>=0); }
+function presidentDe(ce){ const p=ce&&ce.presidentId?S.ens.find(x=>x.id===ce.presidentId):null; return p&&FONCTIONS_PRES.indexOf(p.fonction)>=0?p:null; }
+function qualitePres(p){ return /censeur/i.test(p.fonction)?"censeur":"conseiller principal d'éducation"; }
+function majPresident113(v){ conseilEtab(trimActif).presidentId=v||""; modifie(); }
+function blocPresident113(){
+  const ce=conseilEtab(trimActif), L=presidentsPossibles(), p=presidentDe(ce);
+  return '<div class="champ pres113"><label>Président du conseil</label><select onchange="majPresident113(this.value)"'+(profilMoi()==="chef"?'':' disabled')+'>'
+    +'<option value="">'+esc((S.etab.chef||"Le chef d'établissement")+" — "+titreChefDoc())+'</option>'
+    +L.map(x=>'<option value="'+x.id+'"'+(p&&p.id===x.id?' selected':'')+'>'+esc(x.nom+" — "+(/censeur/i.test(x.fonction)?"Censeur":"Conseiller principal d'éducation"))+'</option>').join("")
+    +'</select>'+(L.length?'':'<p class="aide">Pour choisir le censeur ou le conseiller principal d\'éducation, enregistrez-le d\'abord dans Personnel.</p>')+'</div>';
+}
+/* écran Conseil des classes */
+const VUES_conseil_av1131=VUES.conseil;
+VUES.conseil=function(){
+  if(!polyvalent113()){ cote113="T"; return blocPresident113()+VUES_conseil_av1131.apply(this,arguments); }
+  const seg='<div class="segm cote113"><button class="'+(cote113==="T"?"on":"")+'" onclick="choisirCote113(\'T\')">Classes en trimestres</button>'
+    +'<button class="'+(cote113==="S"?"on":"")+'" onclick="choisirCote113(\'S\')">Classes en semestres</button></div>';
+  let h;
+  if(cote113==="S"){ if(trimActif===2) trimActif=semDuJour(); const Sm=classesSem();
+    h=avecCl(Sm[0].id,()=>avecClasses(Sm,()=>VUES_conseil_av1131.apply(this,arguments))); h=versSemestres(h); }
+  else h=avecClasses(classesTrim(),()=>VUES_conseil_av1131.apply(this,arguments));
+  h=h.replace(/<div class="info poly113i">[\s\S]*?<\/button><\/div>/,"");
+  return seg+'<p class="aide">'+(cote113==="S"?"Conseil des "+classesSem().length+" classe(s) en semestres : 1er semestre, puis 2e semestre (fin d'année). Ses informations sont propres à ce côté.":"Conseil des classes en trimestres.")+'</p>'+blocPresident113()+h;
+};
+/* procès-verbal : le côté choisi, ses informations, son président */
+const pvConseilHTML_av1131=pvConseilHTML;
+pvConseilHTML=function(t){
+  const a=pvSem113; if(coteSem()) pvSem113=true;
+  let h; try{ h=pvConseilHTML_av1131(t); } finally{ pvSem113=a; }
+  const p=presidentDe(conseilEtab(t));
+  if(p&&h){ const anc='sous la présidence de '+esc(S.etab.chef||"…")+', '+esc(titreChefMin().replace(/^le /,""))+' de l\'établissement';
+    h=h.replace(anc,'sous la présidence de '+esc(p.nom)+', '+qualitePres(p)+' de l\'établissement'); }
+  return h;
+};
+/* =====================================================================
+   Burkindi 1.13.1 — p36 : une seule loupe (maquettes 1.13.1 v2, point 4).
+   La recherche du haut (élèves, personnel) trouve aussi les ÉCRANS et
+   réglages : taper « coef » → Matières et coefficients, un clic ouvre
+   l'écran. Seuls les écrans permis au profil sont proposés.
+   Ctrl + K (ordinateur) place le curseur dans la loupe.
+   ===================================================================== */
+const SYN113={matieres:"coef coefficient coefficients disciplines programme volume horaire",conseil:"pp professeur principal pv proces verbal president",
+  calendrier:"semestre semestres trimestre regime vacances feries rentree periode",int_caisse:"argent paiement payer encaisser frais scolarite",
+  int_docs:"budget bilan synthese etats financiers dresfpt",ens:"personnel agents enseignants professeurs import canevas",classes:"serie series filiere specialite technique professionnel polyvalent",
+  edt:"emploi du temps edt import canevas",services:"repartition services edt",bulletins:"bulletin moyenne rang",notes:"saisie notes devoirs compositions",
+  fiches:"fiches excel enseignants",eleves:"inscription inscrire eleves",licence:"licence authenticite qr",utilisateurs:"codes acces mot de passe profils",
+  vie:"absences retards conduite discipline",passage:"passage annee redoublement"};
+function ecransCherches(q){
+  const x=normNom(q); if(x.length<2) return [];
+  const mots=x.split(" ").filter(Boolean), vus={}, L=[];
+  const cles=[...new Set(Object.keys(TITRE_VUE).concat(Object.keys(AIDE||{})))].filter(v=>typeof VUES[v]==="function");
+  cles.forEach(function(v){
+    if(vus[v]) return; if(typeof vueAutorisee==="function"&&!vueAutorisee(v)) return;
+    const titre=titreAide(v), a=(AIDE||{})[v], esp=(ESPACES[ESPACE_DE[v]]||{}).t||"";
+    const fort=normNom(titre+" "+(SYN113[v]||"")), faible=normNom((a?a.d+" "+a.e.join(" "):"")+" "+esp);
+    let sc=0; mots.forEach(w=>{ if(fort.indexOf(w)>=0) sc+=3; else if(faible.indexOf(w)>=0) sc+=1; else sc-=10; });
+    if(sc>0){ vus[v]=1; L.push({v:v,t:titre,e:esp,sc:sc}); }
+  });
+  return L.sort((a,b)=>b.sc-a.sc||a.t.localeCompare(b.t,"fr")).slice(0,5);
+}
+function ouvrirEcran113(v){ const q=document.getElementById("rechQ"); if(q){ q.value=""; q.blur(); } fermerRecherche(true); go(v); }
+const majRecherche_av1131=majRecherche;
+majRecherche=function(){
+  majRecherche_av1131.apply(this,arguments);
+  const q=document.getElementById("rechQ"), z=document.getElementById("rechRes"); if(!q||!z) return;
+  const E=ecransCherches(q.value); if(!E.length) return;
+  const h='<div class="rgrp">Écrans et réglages</div>'+E.map(x=>'<div class="r ecr113" role="option" onmousedown="event.preventDefault()" onclick="ouvrirEcran113(\''+x.v+'\')"><span class="vign ecr">›</span>'
+    +'<div><div class="n">'+esc(x.t)+'</div><div class="m">'+esc((x.e?x.e+" › ":"")+x.t)+'</div></div>'
+    +((AIDE||{})[x.v]?'<button class="aide113" title="Aide de cet écran" onmousedown="event.preventDefault()" onclick="event.stopPropagation();ouvrirAide(\''+x.v+'\')">?</button>':'')+'</div>').join("");
+  const v=z.querySelector(".vide"); if(v&&!rechListe.length) v.remove();
+  z.insertAdjacentHTML("afterbegin",h); z.style.display="";
+};
+function placeholder113(){ const q=document.getElementById("rechQ"); if(q) q.placeholder="Rechercher : élève, agent ou écran (ex. coefficient)"; }
+const go_av1131=go;
+go=function(){ const r=go_av1131.apply(this,arguments); placeholder113(); return r; };
+placeholder113();
+document.addEventListener("keydown",function(ev){
+  if((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&(ev.key==="k"||ev.key==="K")){
+    const q=document.getElementById("rechQ"); if(!q) return; ev.preventDefault();
+    const b=document.getElementById("bar"); if(b&&getComputedStyle(q).display==="none") b.classList.add("ouverte");
+    q.focus(); q.select&&q.select(); majRecherche(); }
+});
+/* depuis l'aide d'un écran : un bouton pour l'ouvrir */
+const ouvrirAide_av1131=ouvrirAide;
+ouvrirAide=function(v){
+  ouvrirAide_av1131.apply(this,arguments);
+  try{ v=v||vueActive; if(!v||v===vueActive||typeof VUES[v]!=="function"||!vueAutorisee(v)) return;
+    const pied=document.getElementById("fpied");
+    if(pied&&!pied.querySelector(".ouv113")){ const b=document.createElement("button"); b.className="btn ouv113"; b.textContent="Ouvrir l'écran";
+      b.onclick=function(){ fermer(); go(v); }; pied.insertBefore(b,pied.firstChild); } }catch(e){}
 };
 
 
