@@ -1980,6 +1980,8 @@ html.sombre .fo-l.bas{background:#3D3112;border-color:#6B5527}
 .pres113{max-width:520px}
 .ecr113 .vign.ecr{background:#E3EFE9;color:#1F5C45;font-weight:800}
 .ecr113{position:relative}.ecr113 .aide113{margin-left:auto;border:1px solid #c9c9c9;background:#fff;border-radius:50%;width:24px;height:24px;font-weight:800;cursor:pointer;flex:0 0 auto}
+.grilles113 .gl113{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-top:1px solid rgba(0,0,0,.08)}
+.grille113 select{max-width:260px}
 /* ===== 1.13 — présentation des documents (même police Times New Roman) =====
    Bulletins : réglages SANS hauteur ajoutée (le pire cas de la 1.12.2, 13
    disciplines à deux par page, n'avait aucune marge : essai z_t11). */
@@ -7165,7 +7167,7 @@ const EDITEUR={nom:"Bassirou DERRA",
 const SERVICES_AUTEUR=["Création de logos","Confection de tee-shirts",
   "Formations en intelligence artificielle et en bureautique",
   "EduP@y : épargne et livraison des fournitures scolaires"];
-const VERSION_APP="1.13.1";
+const VERSION_APP="1.13.2";
 const TITRE_APP=document.title;   /* rétabli après chaque impression */
 function contactAuteur(){ return EDITEUR.nom+", "+EDITEUR.telephone+" ("+EDITEUR.tel2+")"; }
 function logoSVG(t,surVert){
@@ -23885,6 +23887,158 @@ ouvrirAide=function(v){
     const pied=document.getElementById("fpied");
     if(pied&&!pied.querySelector(".ouv113")){ const b=document.createElement("button"); b.className="btn ouv113"; b.textContent="Ouvrir l'écran";
       b.onclick=function(){ fermer(); go(v); }; pied.insertBefore(b,pied.firstChild); } }catch(e){}
+};
+/* =====================================================================
+   Burkindi 1.13.2 — p37 : « Grille de la série » pour les séries sans
+   grille officielle (défaut signalé le 10/11/2026 : disciplines absentes
+   de la fiche de l'enseignant, donc ni répartition ni emploi du temps).
+   - S.grillesSerie113["ordre|niveau|série"] = [{disc, vol, coef}] : saisie
+     par le chef, vaut pour toutes les classes de la série.
+   - Injectée dans GRILLE (src "etab") et DISCIPLINES : fiche enseignant,
+     répartition, emplois du temps, canevas, matières et coefficients.
+   - Mathématiques générales / financières / professionnelles et
+     Statistiques : qualification « Mathématiques » (un professeur de
+     mathématiques peut les enseigner). EPS : pratique + théorie, comme la
+     grille officielle.
+   - Modèle de départ à cocher (disciplines seulement ; sources générales,
+     non vérifiées) ; volumes en heures entières (créneaux d'une heure).
+   ===================================================================== */
+const QUAL113={"Mathématiques générales":"Mathématiques","Mathématiques financières":"Mathématiques","Mathématiques professionnelles":"Mathématiques","Statistiques":"Mathématiques"};
+const DISC_TECH113=["Mathématiques générales","Mathématiques financières","Mathématiques professionnelles","Statistiques",
+  "Électrotechnique","Électronique","Mécanique","Construction mécanique","Fabrication mécanique","Génie civil","Construction et génie civil","Résistance des matériaux","Topographie",
+  "Dessin du bâtiment","Schéma et dessin","Mesures et essais","Technologie","Automatismes","Froid et climatisation","Maintenance","Travaux pratiques de chantier",
+  "Pratique professionnelle (atelier)","Technologie de la spécialité","Hygiène et sécurité","Législation et économie","Stage en entreprise",
+  "Gestion","Techniques administratives","Secrétariat","Commerce","Bureautique","Informatique de gestion","Comptabilité générale",
+  "Algorithmique et programmation","Systèmes et réseaux","Bases de données","Électronique numérique","Hôtellerie-restauration","Habillement","Agriculture"];
+function cleSerie(c){ return c.ordre+"|"+c.niveau+"|"+c.serie; }
+function aGrilleOfficielle(c){ return GRILLE.some(g=>g.ordre===c.ordre&&g.niveau===c.niveau&&g.serie===c.serie&&g.src!=="etab"); }
+function grillesSerie(){ if(!S.grillesSerie113||typeof S.grillesSerie113!=="object") S.grillesSerie113={}; return S.grillesSerie113; }
+let sigG113="";
+function appliquerGrillesSerie(force){
+  const G=(S&&S.grillesSerie113)||{}, sig=JSON.stringify(G)+"|"+JSON.stringify((S&&S.discPerso113)||[]);
+  if(!force&&sig===sigG113) return; sigG113=sig;
+  for(let i=GRILLE.length-1;i>=0;i--) if(GRILLE[i].src==="etab") GRILLE.splice(i,1);
+  Object.keys(G).forEach(function(k){ const p=k.split("|"); if(p.length<3) return; const o=p[0], n=p[1], s=p.slice(2).join("|");
+    (G[k]||[]).forEach(function(l){ const v=Math.max(1,Math.round(Number(l.vol)||0)); if(!l.disc||!v) return;
+      if(l.disc===EPS){ GRILLE.push({ordre:o,niveau:n,serie:s,disc:EPS_PRAT,qual:EPS,vol:Math.min(2,v),opt:false,src:"etab",dec:Math.min(2,v)===2?[1,1]:[1],plage:PLAGE_FRAICHE,espacement:2});
+        if(v>2) GRILLE.push({ordre:o,niveau:n,serie:s,disc:EPS_THEO,qual:EPS,vol:v-2,opt:false,src:"etab",dec:[v-2]}); return; }
+      const g={ordre:o,niveau:n,serie:s,disc:l.disc,vol:v,opt:false,src:"etab",dec:decoupeDefaut(v)}; if(QUAL113[l.disc]) g.qual=QUAL113[l.disc]; GRILLE.push(g); }); });
+  const D=new Set(DISCIPLINES); GRILLE.forEach(g=>D.add(qualDe(g))); DISCIPLINES.length=0; [...D].sort((a,b)=>a.localeCompare(b,"fr")).forEach(x=>DISCIPLINES.push(x));
+}
+const rendre_av1132=rendre;
+rendre=function(){ try{ appliquerGrillesSerie(); }catch(e){} return rendre_av1132.apply(this,arguments); };
+/* coefficients des bulletins tirés de la grille de la série */
+const coefOfficiels_av1132=coefOfficiels;
+coefOfficiels=function(c){ const L=grillesSerie()[cleSerie(c)]; if(L&&L.length&&!aGrilleOfficielle(c)) return L.map(l=>({lib:l.disc,coef:Number(l.coef)||1,active:true,opt:false,motif:""})); return coefOfficiels_av1132(c); };
+/* --- modèle de départ ------------------------------------------------------ */
+const TERTIAIRE113=/compta|secr[ée]tariat|commerce|gestion|administrat/i;
+function modeleSerie(c){
+  const s=String(c.serie||""), n=c.niveau, L=["Français","Anglais"], add=x=>{ if(L.indexOf(x)<0) L.push(x); };
+  const pro=/^(CAP|BEP|Bac pro)/i.test(n);
+  if(c.ordre==="Polyvalent"){ ["Mathématiques générales","Sciences Physiques","Sciences de la Vie et de la Terre","Histoire-Géographie","Technologie","Dessin technique"].forEach(add); }
+  else if(pro){ add("Mathématiques professionnelles"); if(TERTIAIRE113.test(s)) add("Mathématiques financières");
+    ["Pratique professionnelle (atelier)","Technologie de la spécialité"].forEach(add); if(!TERTIAIRE113.test(s)) add("Dessin technique");
+    ["Hygiène et sécurité","Législation et économie","Stage en entreprise"].forEach(add); }
+  else { const x=s.split(" ")[0].toUpperCase();
+    if(/^G/.test(x)){ add("Mathématiques générales"); add("Mathématiques financières"); if(x==="G2") add("Statistiques"); add("Histoire-Géographie"); }
+    else add("Mathématiques générales");
+    const SP={TI:["Sciences Physiques","Dessin technique","Technologie","Travaux pratiques d'atelier"],E:["Sciences Physiques","Construction mécanique","Technologie","Dessin technique"],
+      F1:["Construction mécanique","Fabrication mécanique","Dessin technique","Technologie","Sciences Physiques","Travaux pratiques d'atelier"],
+      F2:["Électronique","Électrotechnique","Mesures et essais","Schéma et dessin","Sciences Physiques","Travaux pratiques d'atelier"],
+      F3:["Électrotechnique","Électronique","Schéma et dessin","Technologie","Sciences Physiques","Travaux pratiques d'atelier"],
+      F4:["Construction et génie civil","Résistance des matériaux","Topographie","Dessin du bâtiment","Sciences Physiques","Travaux pratiques de chantier"],
+      G1:["Techniques administratives","Secrétariat","Bureautique","Comptabilité","Droit","Économie générale"],
+      G2:["Comptabilité générale","Gestion","Droit","Économie générale","Informatique de gestion"],
+      H:["Algorithmique et programmation","Systèmes et réseaux","Bases de données","Électronique numérique"]};
+    (SP[x]||[]).forEach(add); if(n==="2nde") add("Histoire-Géographie"); }
+  if(n==="Tle") add("Philosophie");
+  add(EPS); add("Éducation civique");
+  return L;
+}
+/* --- écran « Grille de la série » ----------------------------------------- */
+let brG113=null;
+function listeDisc113(){ const s=new Set(DISCIPLINES.filter(d=>d.indexOf("(pratique)")<0&&d.indexOf("(théorie)")<0)); DISC_TECH113.forEach(d=>s.add(d)); ((S.discPerso113)||[]).forEach(d=>s.add(d));
+  return [...s].sort((a,b)=>a.localeCompare(b,"fr")); }
+function classesDeSerie(k){ return S.classes.filter(c=>cleSerie(c)===k); }
+function grilleSerieDemande(cid){
+  const c=classe(cid); if(!c) return;
+  if(profilMoi()!=="chef"){ alert("Seul le chef d'établissement saisit la grille d'une série."); return; }
+  if(aGrilleOfficielle(c)){ alert("Cette série a une grille officielle : ajustez les volumes dans Emplois du temps › Grille horaire."); return; }
+  const k=cleSerie(c), L=grillesSerie()[k];
+  brG113={k:k,cid:cid,lignes:L&&L.length?L.map(x=>Object.assign({},x)):modeleSerie(c).map(d=>({disc:d,vol:"",coef:"",modele:true}))};
+  dessinerGrille113();
+}
+function dessinerGrille113(){
+  const B=brG113, c=classe(B.cid), cl=classesDeSerie(B.k), opts=listeDisc113();
+  const tot=B.lignes.reduce((a,l)=>a+(Math.round(Number(l.vol))||0),0);
+  let h='<div class="info"><b>'+esc(c.niveau+" — "+c.serie)+'</b><br>Classes : '+esc(cl.map(x=>x.code).join(", "))+' · grille de l\'établissement</div>'
+   +(B.lignes.some(l=>l.modele)?'<p class="aide">Modèle de départ proposé (disciplines seulement, sources générales, non vérifiées) : retirez ce qui ne convient pas, ajoutez vos disciplines, puis saisissez volumes et coefficients.</p>':'')
+   +'<div class="defile"><table class="tab grille113"><tr><th>Discipline</th><th>h / semaine</th><th>Coefficient</th><th></th></tr>'
+   +B.lignes.map((l,i)=>'<tr><td><select onchange="majLigneG113('+i+',\'disc\',this.value)">'+(opts.indexOf(l.disc)<0&&l.disc?'<option selected>'+esc(l.disc)+'</option>':'')
+       +opts.map(d=>'<option'+(d===l.disc?' selected':'')+'>'+esc(d)+'</option>').join("")+'<option value="__autre">Autre… (à écrire)</option></select></td>'
+     +'<td><input type="number" min="1" max="12" step="1" value="'+esc(String(l.vol))+'" style="width:70px" onchange="majLigneG113('+i+',\'vol\',this.value)"></td>'
+     +'<td><input type="number" min="1" max="10" step="1" value="'+esc(String(l.coef))+'" style="width:70px" onchange="majLigneG113('+i+',\'coef\',this.value)"></td>'
+     +'<td><button class="btn sec" title="Retirer" onclick="retirerLigneG113('+i+')">×</button></td></tr>').join("")
+   +'</table></div><p class="aide">Total : <b>'+tot+' h par semaine</b>. Volumes en heures entières (1 à 12), coefficients de 1 à 10.</p>'
+   +'<div class="barre-actions"><button class="btn sec" onclick="ajouterLigneG113()">+ Ajouter une discipline</button></div>';
+  ouvrir("Grille de la série",h,[{texte:"Enregistrer la grille",action:"sauverGrille113()"},{texte:"Annuler",action:"brG113=null;fermer()",style:"sec"}]);
+}
+function majLigneG113(i,ch,v){ const l=brG113.lignes[i]; if(!l) return;
+  if(ch==="disc"&&v==="__autre"){ const t=String(prompt("Nom de la discipline :","")||"").replace(/\s+/g," ").trim(); if(!t){ dessinerGrille113(); return; }
+    if(!Array.isArray(S.discPerso113)) S.discPerso113=[]; if(S.discPerso113.indexOf(t)<0) S.discPerso113.push(t); v=t; }
+  l[ch]=v; delete l.modele; if(ch==="disc") dessinerGrille113(); else if(ch==="vol") dessinerGrille113(); }
+function ajouterLigneG113(){ brG113.lignes.push({disc:"",vol:"",coef:""}); dessinerGrille113(); }
+function utiliseDansSerie(k,disc){ const cl=classesDeSerie(k).map(c=>c.id), noms=disc===EPS?[EPS_PRAT,EPS_THEO,EPS]:[disc];
+  const cours=S.seances.some(s=>cl.indexOf(s.classeId)>=0&&noms.indexOf(s.disc)>=0);
+  const ids={}; S.eleves.forEach(e=>{ if(cl.indexOf(e.classeId)>=0) ids[e.id]=1; });
+  const notes=Object.keys(S.notes||{}).some(x=>{ const p=x.split("|"); return ids[p[0]]&&p.slice(2).join("|")===disc&&S.notes[x]; });
+  return cours?"des cours":(notes?"des notes":""); }
+function retirerLigneG113(i){ const l=brG113.lignes[i]; if(!l) return;
+  const u=l.disc?utiliseDansSerie(brG113.k,l.disc):""; if(u&&(grillesSerie()[brG113.k]||[]).some(x=>x.disc===l.disc)){ alert("« "+l.disc+" » ne peut pas être retirée : "+u+" y sont déjà enregistré(e)s dans une classe de cette série."); return; }
+  brG113.lignes.splice(i,1); dessinerGrille113(); }
+function sauverGrille113(){
+  const B=brG113; if(!B) return; const vus={}, out=[], err=[];
+  B.lignes.forEach(function(l,i){ if(!l.disc){ if(l.vol||l.coef) err.push("ligne "+(i+1)+" : discipline à choisir"); return; }
+    if(vus[l.disc]){ err.push("« "+l.disc+" » figure deux fois"); return; } vus[l.disc]=1;
+    const v=Number(l.vol), k=Number(l.coef);
+    if(!(v>=1&&v<=12&&Math.round(v)===v)) err.push("« "+l.disc+" » : volume horaire de 1 à 12 h (heures entières)");
+    if(!(k>=1&&k<=10&&Math.round(k)===k)) err.push("« "+l.disc+" » : coefficient de 1 à 10");
+    out.push({disc:l.disc,vol:v,coef:k}); });
+  if(!out.length) err.push("aucune discipline");
+  if(err.length){ alert("La grille n'est pas enregistrée :\n• "+err.join("\n• ")); return; }
+  const anc=grillesSerie()[B.k]||[];
+  anc.forEach(a=>{ if(!vus[a.disc]){ const u=utiliseDansSerie(B.k,a.disc); if(u) err.push("« "+a.disc+" » a "+u+" : gardez-la"); } });
+  if(err.length){ alert("La grille n'est pas enregistrée :\n• "+err.join("\n• ")); return; }
+  grillesSerie()[B.k]=out; appliquerGrillesSerie(true);
+  /* matières et coefficients des classes de la série */
+  classesDeSerie(B.k).forEach(function(c){ const M=S.matieres[c.id]=(S.matieres[c.id]||[]).slice();
+    out.forEach(l=>{ const m=M.find(x=>x.lib===l.disc); if(m){ m.coef=l.coef; m.active=true; } else M.push({lib:l.disc,coef:l.coef,active:true,opt:false,motif:""}); });
+    M.forEach(m=>{ if(!vus[m.lib]&&anc.some(a=>a.disc===m.lib)) m.active=false; });
+    nettoyerClasse(c); });
+  noterImport("GRILLE",B.k+" : "+out.length+" discipline(s)");
+  brG113=null; modifie(); fermer(); rendre();
+  alert("Grille enregistrée. Ses disciplines sont maintenant proposées dans la fiche des enseignants (Personnel), puis dans la répartition des services et les emplois du temps.");
+}
+/* accès : fiche de la classe et écran Classes */
+const dessinerClasse_av1132=dessinerClasse;
+dessinerClasse=function(){
+  const r=dessinerClasse_av1132.apply(this,arguments);
+  try{ const c=brouillon.data, id=brouillon.id, z=document.getElementById("c_grille113");
+    if(z&&!aGrilleOfficielle(c)){ const L=grillesSerie()[cleSerie(c)];
+      z.textContent=L&&L.length?"Grille de la série saisie par l'établissement ("+L.length+" disciplines).":"Pas encore de grille pour cette série : saisissez sa grille (disciplines, volumes, coefficients) pour pouvoir faire la répartition et l'emploi du temps.";
+      if(id){ const b=document.createElement("button"); b.className="btn"; b.style.marginTop="6px"; b.textContent="Grille de la série"; b.onclick=function(){ grilleSerieDemande(id); }; z.appendChild(document.createElement("br")); z.appendChild(b); }
+      else z.textContent+=" Enregistrez d'abord la classe, puis ouvrez-la : le bouton « Grille de la série » y apparaît."; } }catch(e){}
+  return r;
+};
+const VUES_classes_av1132=VUES.classes;
+VUES.classes=function(){
+  let h=VUES_classes_av1132.apply(this,arguments);
+  const vus={}, manq=[];
+  S.classes.forEach(c=>{ if(aGrilleOfficielle(c)) return; const k=cleSerie(c); if(vus[k]) return; vus[k]=1; manq.push({k:k,c:c,ok:(grillesSerie()[k]||[]).length>0}); });
+  if(!manq.length) return h;
+  return '<div class="info grilles113"><b>Séries sans grille officielle</b><p class="aide">Saisissez la grille de chaque série (disciplines, volumes, coefficients), puis donnez ses disciplines aux enseignants dans Personnel.</p>'
+    +manq.map(x=>'<div class="gl113"><span>'+esc(x.c.niveau+" — "+x.c.serie)+' · '+classesDeSerie(x.k).length+' classe(s) · '+(x.ok?'grille saisie':'<b>grille à saisir</b>')+'</span>'
+      +(profilMoi()==="chef"?'<button class="btn'+(x.ok?' sec':'')+'" onclick="grilleSerieDemande(\''+x.c.id+'\')">'+(x.ok?'Modifier la grille':'Saisir la grille')+'</button>':'')+'</div>').join("")+'</div>'+h;
 };
 
 
